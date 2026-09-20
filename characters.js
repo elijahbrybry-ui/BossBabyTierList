@@ -3,7 +3,7 @@ const SHOWS = ["original", "bib", "family", "crib"];
 const ROLES = ["templeton", "babycorp", "playgroup", "friend", "antagonist", "animal"];
 const SHOW_LABELS = { original: "Bossy Baby", bib: "Back in Business", family: "Family Business", crib: "Back in the Crib" };
 const SHOW_SHORT = { original: "BB", bib: "BIB", family: "FB", crib: "BIC" };
-const ROLE_LABELS = { templeton: "Templeton", babycorp: "Baby Corp", playgroup: "Mommy–Daddy–Baby playgroup", friend: "Friends & family", antagonist: "Antagonist", animal: "Animal / group" };
+const ROLE_LABELS = { templeton: "Templeton", babycorp: "Baby Corp", playgroup: "Mommy–Daddy–Baby playgroup", friend: "Friends & family", antagonist: "Antagonist", animal: "Misc" };
 const KEYS = { ranks: "boss-baby-tier-ranks-v1", order: "boss-baby-tier-order-v1", custom: "boss-baby-tier-custom-v1", view: "boss-baby-tier-view-v1" };
 
 // Named, credited, recurring and collective entries researched across the four requested titles.
@@ -31,8 +31,8 @@ add("family", "friend", ["Wizzie", "Story Bear Connie", "Dr. Tiffany Hamilton", 
 add("bib", "templeton", ["Boss Baby (Theodore Templeton Jr.)", "Tim Templeton", "Ted Templeton Sr.", "Janice Templeton", "Gigi Templeton", "Big Ed"]);
 add("bib", "babycorp", ["Jimbo", "Staci", "Triplets", "Dondre", "Mega Fat CEO Baby", "Magnus", "Hendershot", "Scooter Buskie", "Amal", "Buddy from HR", "R&D Baby Simmons", "Marsha Krinkle", "Security Baby Katja", "Security Baby Phil", "Chip", "Junior Fancy", "Pull-String CEO Baby", "Gina Namashita", "Tina Namashita", "Hermano Menor Director Baby", "Rattleshake CEO Baby", "Scary Sweary CEO Baby", "Turtleneck Superstar", "Miss Multi-Multitask CEO Baby", "Frankie", "Joy Freeman (Quiet Psycho Baby)", "Brayden", "No Baby", "Bystander Baby"]);
 add("bib", "friend", ["Danny Petrosky", "Marisol Lopez Lugo", "Officer Doug Fardy", "Mayor Freeman", "Pearl Freeman", "Mr. Buskie", "Mrs. Buskie", "Donald", "Guitar Baby", "Jarreau McIntosh", "Marcos Lightspeed", "Thomas Kulkelka", "Sandy Burgess", "Ms. Hansen-Jansen", "Ms. Summer", "Midge Marksberry", "Hae-Sook", "Carlisle", "Chito", "Dakota", "Debbie", "Georgo", "Roosevelt", "Taffeta", "Vedant", "Namashitas", "Emiliano", "Iggy", "Bryce", "Mrs. Fardy", "Danny Petrosky's Dad"]);
-add("bib", "antagonist", ["Bootsy Calico", "Wendi McCraken", "Frederic Estes", "Happy Sedengry", "Maria Maria", "Pyg", "Tam", "OCB", "Wagby", "Travis Le Duque", "Frodarg", "Dr. Kevin, MD", "Bug the Pug", "Cat Cop", "Japanese Toy Swing", "Mr. Pineapple", "Hunnerdbuttons", "Copy Cats", "Mangy Cat", "Little Nugget", "Consortium of Ancients"]);
-add("bib", "animal", ["Forever Puppy", "Gwendolyn", "Lamb Lamb", "Football Mike"]);
+add("bib", "antagonist", ["Bootsy Calico", "Wendi McCraken", "Frederic Estes", "Happy Sedengry", "Maria Maria", "Pyg", "Tam", "OCB", "Wagby", "Travis Le Duque", "Frodarg", "Bug the Pug", "Cat Cop", "Mr. Pineapple", "Hunnerdbuttons", "Copy Cats", "Mangy Cat", "Little Nugget", "Consortium of Ancients"]);
+add("bib", "animal", ["Dr. Kevin, MD", "Japanese Toy Swing", "Forever Puppy", "Gwendolyn", "Lamb Lamb", "Football Mike"]);
 
 add("crib", "templeton", ["Boss Baby (Theodore Templeton Jr.)", "Tim Templeton", "Carol Templeton", "Tina Templeton", "Tabitha Templeton"]);
 add("crib", "babycorp", ["JJ", "Pip", "Dez", "Hendershot", "Amal", "Buddy from HR", "R&D Baby Simmons", "Marsha Krinkle", "Security Baby Katja", "Chip", "I.T. Baby Cammy", "Junior Fancy Jr.", "Nannycam No-Filter CEO Baby", "Bad Idea Baby", "Jackie Business", "Board Baby Agnes", "Banker Baby Benny", "Criminal Baby Paula", "Criminal Baby Mateo", "Worker Baby Aoife", "H. Phyllis Sky-Larkin", "UBO", "Mega Fat CEO Baby"]);
@@ -64,7 +64,6 @@ const RELEVANCE_ORDER = [
   "Ted Templeton Sr.",
   "Janice Templeton",
   "Gigi Templeton",
-  "Big Ed",
   "JJ",
   "Pip",
   "Dez",
@@ -93,6 +92,7 @@ const RELEVANCE_ORDER = [
   "Security Baby Katja",
   "Security Baby Phil",
   "Frankie",
+  "Big Ed",
   "Wizzie",
   "Precious Templeton",
   "Uncuddleables",
@@ -199,9 +199,19 @@ function makeCard(character) {
 }
 function setRank(id, tier, targetId = null, after = false) { state.order = state.order.filter((entry) => entry !== id); if (tier === "unranked") delete state.ranks[id]; else { state.ranks[id] = tier; const index = targetId && targetId !== id ? state.order.indexOf(targetId) : -1; if (index >= 0) state.order.splice(index + Number(after), 0, id); else state.order.splice(state.order.findLastIndex((entry) => state.ranks[entry] === tier) + 1, 0, id); } save(); render(); }
 function render() {
-  document.querySelectorAll(".dropzone").forEach((zone) => { zone.innerHTML = ""; }); const fragments = Object.fromEntries(["unranked", ...TIERS].map((tier) => [tier, document.createDocumentFragment()]));
-  const selectedShows = new Set(els.shows.filter((box) => box.checked).map((box) => box.value)); const selectedRoles = new Set(els.roles.filter((box) => box.checked).map((box) => box.value)); const search = els.search.value.trim().toLowerCase(); const sortMode = els.sort.value; let visible = 0;
-  const compareCharacters = (a, b) => {
+  document.querySelectorAll(".dropzone").forEach((zone) => { zone.innerHTML = ""; });
+  const fragments = Object.fromEntries(["unranked", ...TIERS].map((tier) => [tier, document.createDocumentFragment()]));
+  const selectedShows = new Set(els.shows.filter((box) => box.checked).map((box) => box.value));
+  const selectedRoles = new Set(els.roles.filter((box) => box.checked).map((box) => box.value));
+  const search = els.search.value.trim().toLowerCase();
+  const sortMode = els.sort.value;
+  const ordering = new Map(state.order.map((id, index) => [id, index]));
+  let visible = 0;
+
+  // The Sort by menu controls the unranked directory only. Ranked tier rows
+  // always respect the user's saved drag order so cards can be rearranged
+  // freely within S/A/B/C/D/F.
+  const compareUnranked = (a, b) => {
     if (sortMode === "az") return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     if (sortMode === "za") return b.name.localeCompare(a.name, undefined, { sensitivity: "base" });
     const aRank = RELEVANCE_RANK.get(a.name);
@@ -210,8 +220,30 @@ function render() {
     if (a.shows.length !== b.shows.length) return b.shows.length - a.shows.length;
     return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
   };
-  allCharacters().sort(compareCharacters).forEach((character) => { const card = makeCard(character); const matches = character.shows.some((show) => selectedShows.has(show)) && selectedRoles.has(character.role) && (!search || character.name.toLowerCase().includes(search)); card.hidden = !matches; if (matches) visible += 1; fragments[state.ranks[character.id] || "unranked"].append(card); });
-  Object.entries(fragments).forEach(([tier, fragment]) => document.querySelector(`[data-tier="${tier}"]`).append(fragment)); els.visible.textContent = `${visible} shown`; els.ranked.textContent = `${Object.keys(state.ranks).length} ranked`; els.catalogue.textContent = `${allCharacters().length} directory entries`;
+
+  const characters = allCharacters();
+  const unranked = characters.filter((character) => !state.ranks[character.id]).sort(compareUnranked);
+  const ranked = characters
+    .filter((character) => state.ranks[character.id])
+    .sort((a, b) => {
+      const aOrder = ordering.get(a.id);
+      const bOrder = ordering.get(b.id);
+      if (aOrder !== undefined || bOrder !== undefined) return (aOrder ?? Infinity) - (bOrder ?? Infinity);
+      return compareUnranked(a, b);
+    });
+
+  [...unranked, ...ranked].forEach((character) => {
+    const card = makeCard(character);
+    const matches = character.shows.some((show) => selectedShows.has(show)) && selectedRoles.has(character.role) && (!search || character.name.toLowerCase().includes(search));
+    card.hidden = !matches;
+    if (matches) visible += 1;
+    fragments[state.ranks[character.id] || "unranked"].append(card);
+  });
+
+  Object.entries(fragments).forEach(([tier, fragment]) => document.querySelector(`[data-tier="${tier}"]`).append(fragment));
+  els.visible.textContent = `${visible} shown`;
+  els.ranked.textContent = `${Object.keys(state.ranks).length} ranked`;
+  els.catalogue.textContent = `${allCharacters().length} directory entries`;
 }
 function clearDropHints() {
   document.querySelectorAll(".dropzone.drag-over").forEach((zone) => zone.classList.remove("drag-over"));
