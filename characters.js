@@ -197,70 +197,119 @@ function setupDropzones() {
 }
 
 function setupTouchDragging() {
-  let touchId = null;
+  // Modern phones/tablets expose touch as Pointer Events. Using them instead of
+  // the HTML draggable API avoids iOS/Android cancelling the drag to scroll.
+  let pointerId = null;
   let startX = 0;
   let startY = 0;
   let dragging = false;
   let draggedCard = null;
+  let ghost = null;
 
-  document.addEventListener("touchstart", (event) => {
-    if (event.touches.length !== 1 || event.target.closest(".remove-character")) return;
-    const card = event.target.closest(".character-card:not([hidden])");
-    if (!card) return;
+  function removeGhost() {
+    ghost?.remove();
+    ghost = null;
+  }
 
-    const touch = event.touches[0];
-    touchId = touch.identifier;
-    startX = touch.clientX;
-    startY = touch.clientY;
-    dragging = false;
-    draggedCard = card;
-  }, { passive: true });
+  function makeGhost(card, x, y) {
+    ghost = card.cloneNode(true);
+    ghost.classList.remove("dragging", "drop-before", "drop-after");
+    ghost.classList.add("touch-drag-ghost");
+    ghost.removeAttribute("draggable");
+    ghost.querySelector(".remove-character")?.remove();
+    document.body.append(ghost);
+    moveGhost(x, y);
+  }
 
-  document.addEventListener("touchmove", (event) => {
-    if (touchId === null || !draggedCard) return;
-    const touch = Array.from(event.touches).find((item) => item.identifier === touchId);
-    if (!touch) return;
+  function moveGhost(x, y) {
+    if (!ghost) return;
+    ghost.style.left = `${x}px`;
+    ghost.style.top = `${y}px`;
+  }
 
-    if (!dragging) {
-      const distance = Math.hypot(touch.clientX - startX, touch.clientY - startY);
-      if (distance < 8) return;
-      dragging = true;
-      state.draggedId = draggedCard.dataset.id;
-      draggedCard.classList.add("dragging");
+  function autoScroll(y) {
+    const edge = Math.min(110, window.innerHeight * 0.18);
+    const maxSpeed = 18;
+    if (y < edge) {
+      const speed = -Math.ceil(maxSpeed * (1 - y / edge));
+      window.scrollBy(0, speed);
+    } else if (y > window.innerHeight - edge) {
+      const distance = window.innerHeight - y;
+      const speed = Math.ceil(maxSpeed * (1 - distance / edge));
+      window.scrollBy(0, speed);
     }
+  }
 
-    // Once the finger has actually started dragging a card, stop page scrolling.
-    event.preventDefault();
-    showDropHint(touch.clientX, touch.clientY);
-  }, { passive: false });
-
-  document.addEventListener("touchend", (event) => {
-    if (touchId === null) return;
-    const touch = Array.from(event.changedTouches).find((item) => item.identifier === touchId);
-
-    if (dragging && touch && state.draggedId) {
-      const { zone, target, after } = getDropTargetAtPoint(touch.clientX, touch.clientY);
+  function finishDrag(x, y, cancelled = false) {
+    if (dragging && !cancelled && state.draggedId) {
+      const { zone, target, after } = getDropTargetAtPoint(x, y);
       const draggedId = state.draggedId;
       if (zone) setRank(draggedId, zone.dataset.tier, target?.dataset.id, after);
     }
 
     clearDropHints();
     draggedCard?.classList.remove("dragging");
+    try {
+      if (draggedCard && pointerId !== null && draggedCard.hasPointerCapture?.(pointerId)) {
+        draggedCard.releasePointerCapture(pointerId);
+      }
+    } catch {}
+    removeGhost();
     state.draggedId = null;
-    touchId = null;
+    pointerId = null;
     dragging = false;
     draggedCard = null;
-  }, { passive: true });
+    document.body.classList.remove("touch-ranking");
+  }
 
-  document.addEventListener("touchcancel", () => {
-    clearDropHints();
-    draggedCard?.classList.remove("dragging");
-    state.draggedId = null;
-    touchId = null;
+  document.addEventListener("pointerdown", (event) => {
+    // Keep the existing native HTML drag/drop for a mouse.
+    if (event.pointerType === "mouse" || !event.isPrimary || event.button !== 0) return;
+    if (event.target.closest(".remove-character")) return;
+
+    const card = event.target.closest(".character-card:not([hidden])");
+    if (!card) return;
+
+    pointerId = event.pointerId;
+    startX = event.clientX;
+    startY = event.clientY;
     dragging = false;
-    draggedCard = null;
-  }, { passive: true });
+    draggedCard = card;
+
+    try { card.setPointerCapture(pointerId); } catch {}
+  });
+
+  document.addEventListener("pointermove", (event) => {
+    if (pointerId === null || event.pointerId !== pointerId || !draggedCard) return;
+
+    if (!dragging) {
+      const distance = Math.hypot(event.clientX - startX, event.clientY - startY);
+      if (distance < 5) return;
+
+      dragging = true;
+      state.draggedId = draggedCard.dataset.id;
+      draggedCard.classList.add("dragging");
+      document.body.classList.add("touch-ranking");
+      makeGhost(draggedCard, event.clientX, event.clientY);
+    }
+
+    event.preventDefault();
+    moveGhost(event.clientX, event.clientY);
+    autoScroll(event.clientY);
+    showDropHint(event.clientX, event.clientY);
+  }, { passive: false });
+
+  document.addEventListener("pointerup", (event) => {
+    if (pointerId === null || event.pointerId !== pointerId) return;
+    finishDrag(event.clientX, event.clientY, false);
+  });
+
+  document.addEventListener("pointercancel", (event) => {
+    if (pointerId === null || event.pointerId !== pointerId) return;
+    finishDrag(event.clientX, event.clientY, true);
+  });
 }
+
 function exportList() { const data = { format: "boss-baby-character-tier-list", version: 1, ranks: state.ranks, order: state.order, custom: state.custom, shows: els.shows.filter((box) => box.checked).map((box) => box.value), roles: els.roles.filter((box) => box.checked).map((box) => box.value), search: els.search.value }; const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })); const a = document.createElement("a"); a.href = url; a.download = "boss-baby-characters.bblist"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); els.status.textContent = "Tier list exported."; }
 async function importList(file) { if (!file) return; try { if (file.size > 2_000_000) throw new Error("That save file is too large."); const data = JSON.parse(await file.text()); if (data?.format !== "boss-baby-character-tier-list" || data.version !== 1 || typeof data.ranks !== "object" || !Array.isArray(data.order) || !Array.isArray(data.custom)) throw new Error("This is not a Boss Baby tier-list save."); const ids = new Set([...state.base.map((entry) => entry.id), ...data.custom.map((entry) => entry.id)]); if (Object.entries(data.ranks).some(([id, tier]) => !ids.has(id) || !TIERS.includes(tier))) throw new Error("This save has invalid rankings."); state.ranks = data.ranks; state.order = data.order.filter((id) => ids.has(id)); state.custom = data.custom.filter((entry) => entry?.custom && typeof entry.name === "string" && SHOWS.includes(entry.shows?.[0]) && ROLES.includes(entry.role)); els.shows.forEach((box) => { box.checked = data.shows?.includes(box.value); }); els.roles.forEach((box) => { box.checked = data.roles?.includes(box.value); }); els.search.value = typeof data.search === "string" ? data.search : ""; save(); saveView(); render(); els.status.textContent = "Tier list imported."; } catch (error) { els.status.textContent = error instanceof SyntaxError ? "Could not read that save file." : error.message; } finally { els.file.value = ""; } }
 function addCharacter(event) { event.preventDefault(); const data = new FormData(els.form); const name = String(data.get("name") || "").trim(); if (!name) return; if (allCharacters().some((character) => character.name.toLowerCase() === name.toLowerCase())) { els.addError.textContent = "That character is already in the directory."; return; } state.custom.push({ id: `custom-${crypto.randomUUID()}`, name, role: data.get("role"), shows: [data.get("show")], custom: true }); save(); els.dialog.close(); els.form.reset(); els.addError.textContent = ""; els.status.textContent = `${name} added to the directory.`; render(); }
