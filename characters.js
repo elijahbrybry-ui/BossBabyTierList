@@ -144,10 +144,126 @@ function render() {
   allCharacters().sort((a, b) => (ordering.get(a.id) ?? Infinity) - (ordering.get(b.id) ?? Infinity) || a.name.localeCompare(b.name)).forEach((character) => { const card = makeCard(character); const matches = character.shows.some((show) => selectedShows.has(show)) && selectedRoles.has(character.role) && (!search || character.name.toLowerCase().includes(search)); card.hidden = !matches; if (matches) visible += 1; fragments[state.ranks[character.id] || "unranked"].append(card); });
   Object.entries(fragments).forEach(([tier, fragment]) => document.querySelector(`[data-tier="${tier}"]`).append(fragment)); els.visible.textContent = `${visible} shown`; els.ranked.textContent = `${Object.keys(state.ranks).length} ranked`; els.catalogue.textContent = `${allCharacters().length} directory entries`;
 }
-function setupDropzones() { document.addEventListener("dragover", (event) => { const zone = event.target.closest(".dropzone"); if (!zone || !state.draggedId) return; event.preventDefault(); zone.classList.add("drag-over"); document.querySelectorAll(".drop-before,.drop-after").forEach((card) => card.classList.remove("drop-before", "drop-after")); const target = event.target.closest(".character-card:not([hidden])"); if (target && target.dataset.id !== state.draggedId && zone.dataset.tier !== "unranked") target.classList.add(event.clientX < target.getBoundingClientRect().left + target.offsetWidth / 2 ? "drop-before" : "drop-after"); }); document.addEventListener("dragleave", (event) => event.target.closest(".dropzone")?.classList.remove("drag-over")); document.addEventListener("drop", (event) => { const zone = event.target.closest(".dropzone"); if (!zone || !state.draggedId) return; event.preventDefault(); zone.classList.remove("drag-over"); const target = event.target.closest(".character-card:not([hidden])"); const after = Boolean(target?.classList.contains("drop-after")); document.querySelectorAll(".drop-before,.drop-after").forEach((card) => card.classList.remove("drop-before", "drop-after")); setRank(state.draggedId, zone.dataset.tier, target?.dataset.id, after); }); }
+function clearDropHints() {
+  document.querySelectorAll(".dropzone.drag-over").forEach((zone) => zone.classList.remove("drag-over"));
+  document.querySelectorAll(".drop-before,.drop-after").forEach((card) => card.classList.remove("drop-before", "drop-after"));
+}
+
+function getDropTargetAtPoint(x, y) {
+  const element = document.elementFromPoint(x, y);
+  const zone = element?.closest(".dropzone");
+  if (!zone) return { zone: null, target: null, after: false };
+
+  const target = element.closest(".character-card:not([hidden])");
+  if (!target || target.dataset.id === state.draggedId || zone.dataset.tier === "unranked") {
+    return { zone, target: null, after: false };
+  }
+
+  const rect = target.getBoundingClientRect();
+  // Phones show cards full-width/stacked, so compare vertically there.
+  // Wider layouts compare horizontally like the desktop drag behaviour.
+  const stacked = rect.width > zone.getBoundingClientRect().width * 0.7;
+  const after = stacked ? y >= rect.top + rect.height / 2 : x >= rect.left + rect.width / 2;
+  return { zone, target, after };
+}
+
+function showDropHint(x, y) {
+  clearDropHints();
+  const { zone, target, after } = getDropTargetAtPoint(x, y);
+  if (!zone) return;
+  zone.classList.add("drag-over");
+  if (target) target.classList.add(after ? "drop-after" : "drop-before");
+}
+
+function setupDropzones() {
+  document.addEventListener("dragover", (event) => {
+    const zone = event.target.closest(".dropzone");
+    if (!zone || !state.draggedId) return;
+    event.preventDefault();
+    showDropHint(event.clientX, event.clientY);
+  });
+
+  document.addEventListener("dragleave", (event) => event.target.closest(".dropzone")?.classList.remove("drag-over"));
+
+  document.addEventListener("drop", (event) => {
+    if (!state.draggedId) return;
+    const { zone, target, after } = getDropTargetAtPoint(event.clientX, event.clientY);
+    if (!zone) return;
+    event.preventDefault();
+    const draggedId = state.draggedId;
+    clearDropHints();
+    setRank(draggedId, zone.dataset.tier, target?.dataset.id, after);
+  });
+}
+
+function setupTouchDragging() {
+  let touchId = null;
+  let startX = 0;
+  let startY = 0;
+  let dragging = false;
+  let draggedCard = null;
+
+  document.addEventListener("touchstart", (event) => {
+    if (event.touches.length !== 1 || event.target.closest(".remove-character")) return;
+    const card = event.target.closest(".character-card:not([hidden])");
+    if (!card) return;
+
+    const touch = event.touches[0];
+    touchId = touch.identifier;
+    startX = touch.clientX;
+    startY = touch.clientY;
+    dragging = false;
+    draggedCard = card;
+  }, { passive: true });
+
+  document.addEventListener("touchmove", (event) => {
+    if (touchId === null || !draggedCard) return;
+    const touch = Array.from(event.touches).find((item) => item.identifier === touchId);
+    if (!touch) return;
+
+    if (!dragging) {
+      const distance = Math.hypot(touch.clientX - startX, touch.clientY - startY);
+      if (distance < 8) return;
+      dragging = true;
+      state.draggedId = draggedCard.dataset.id;
+      draggedCard.classList.add("dragging");
+    }
+
+    // Once the finger has actually started dragging a card, stop page scrolling.
+    event.preventDefault();
+    showDropHint(touch.clientX, touch.clientY);
+  }, { passive: false });
+
+  document.addEventListener("touchend", (event) => {
+    if (touchId === null) return;
+    const touch = Array.from(event.changedTouches).find((item) => item.identifier === touchId);
+
+    if (dragging && touch && state.draggedId) {
+      const { zone, target, after } = getDropTargetAtPoint(touch.clientX, touch.clientY);
+      const draggedId = state.draggedId;
+      if (zone) setRank(draggedId, zone.dataset.tier, target?.dataset.id, after);
+    }
+
+    clearDropHints();
+    draggedCard?.classList.remove("dragging");
+    state.draggedId = null;
+    touchId = null;
+    dragging = false;
+    draggedCard = null;
+  }, { passive: true });
+
+  document.addEventListener("touchcancel", () => {
+    clearDropHints();
+    draggedCard?.classList.remove("dragging");
+    state.draggedId = null;
+    touchId = null;
+    dragging = false;
+    draggedCard = null;
+  }, { passive: true });
+}
 function exportList() { const data = { format: "boss-baby-character-tier-list", version: 1, ranks: state.ranks, order: state.order, custom: state.custom, shows: els.shows.filter((box) => box.checked).map((box) => box.value), roles: els.roles.filter((box) => box.checked).map((box) => box.value), search: els.search.value }; const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })); const a = document.createElement("a"); a.href = url; a.download = "boss-baby-characters.bblist"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); els.status.textContent = "Tier list exported."; }
 async function importList(file) { if (!file) return; try { if (file.size > 2_000_000) throw new Error("That save file is too large."); const data = JSON.parse(await file.text()); if (data?.format !== "boss-baby-character-tier-list" || data.version !== 1 || typeof data.ranks !== "object" || !Array.isArray(data.order) || !Array.isArray(data.custom)) throw new Error("This is not a Boss Baby tier-list save."); const ids = new Set([...state.base.map((entry) => entry.id), ...data.custom.map((entry) => entry.id)]); if (Object.entries(data.ranks).some(([id, tier]) => !ids.has(id) || !TIERS.includes(tier))) throw new Error("This save has invalid rankings."); state.ranks = data.ranks; state.order = data.order.filter((id) => ids.has(id)); state.custom = data.custom.filter((entry) => entry?.custom && typeof entry.name === "string" && SHOWS.includes(entry.shows?.[0]) && ROLES.includes(entry.role)); els.shows.forEach((box) => { box.checked = data.shows?.includes(box.value); }); els.roles.forEach((box) => { box.checked = data.roles?.includes(box.value); }); els.search.value = typeof data.search === "string" ? data.search : ""; save(); saveView(); render(); els.status.textContent = "Tier list imported."; } catch (error) { els.status.textContent = error instanceof SyntaxError ? "Could not read that save file." : error.message; } finally { els.file.value = ""; } }
 function addCharacter(event) { event.preventDefault(); const data = new FormData(els.form); const name = String(data.get("name") || "").trim(); if (!name) return; if (allCharacters().some((character) => character.name.toLowerCase() === name.toLowerCase())) { els.addError.textContent = "That character is already in the directory."; return; } state.custom.push({ id: `custom-${crypto.randomUUID()}`, name, role: data.get("role"), shows: [data.get("show")], custom: true }); save(); els.dialog.close(); els.form.reset(); els.addError.textContent = ""; els.status.textContent = `${name} added to the directory.`; render(); }
-makeRows(); setupDropzones(); restoreView(); render();
+makeRows(); setupDropzones(); setupTouchDragging(); restoreView(); render();
 els.search.addEventListener("input", () => { saveView(); render(); }); [...els.shows, ...els.roles].forEach((box) => box.addEventListener("change", () => { saveView(); render(); }));
 els.save.addEventListener("click", () => { save(); saveView(); els.status.textContent = "Saved in this browser on this device."; }); els.export.addEventListener("click", exportList); els.importer.addEventListener("click", () => els.file.click()); els.file.addEventListener("change", () => importList(els.file.files[0])); els.reset.addEventListener("click", () => { state.ranks = {}; state.order = []; save(); render(); els.status.textContent = "All ranks reset."; }); els.add.addEventListener("click", () => els.dialog.showModal()); document.querySelector("#cancelAdd").addEventListener("click", () => els.dialog.close()); els.form.addEventListener("submit", addCharacter);
