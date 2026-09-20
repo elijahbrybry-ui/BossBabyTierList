@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#061732" />
     <title>Boss Baby Character Tier List</title>
     <meta name="description" content="A complete, interactive Boss Baby character tier list." />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=4" />
   </head>
   <body>
     <main class="shell">
@@ -28,6 +28,15 @@
         <label class="search-box">
           <span>Find a character</span>
           <input id="searchInput" type="search" placeholder="Boss Baby, Tabitha, Nannycam…" autocomplete="off" />
+        </label>
+
+        <label class="sort-box">
+          <span>Sort by</span>
+          <select id="sortSelect" aria-label="Sort characters">
+            <option value="relevance">Relevance</option>
+            <option value="az">Alphabetical A-Z</option>
+            <option value="za">Alphabetical Z-A</option>
+          </select>
         </label>
 
         <fieldset class="continuity-filter">
@@ -112,6 +121,6 @@
         <button class="remove-character" type="button" title="Remove custom character" aria-label="Remove custom character">×</button>
       </article>
     </template>
-    <script src="./characters.js?v=3"></script>
+    <script src="./characters.js?v=5"></script>
   </body>
 </html>
