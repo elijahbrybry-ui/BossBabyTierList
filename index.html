@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#061732" />
+    <title>Boss Baby Character Tier List</title>
+    <meta name="description" content="A complete, interactive Boss Baby character tier list." />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="masthead">
+        <div class="brand-lockup" aria-label="Boss Baby character tier list">
+          <span class="brand-mark" aria-hidden="true">BB</span>
+          <div>
+            <p class="kicker">Baby Corp presents</p>
+            <h1>Boss Baby <em>Character Tier List</em></h1>
+          </div>
+        </div>
+        <div class="stats" aria-live="polite">
+          <span id="visibleCount">0 shown</span>
+          <span id="rankedCount">0 ranked</span>
+        </div>
+      </header>
+
+      <section class="control-panel" aria-label="Tier list controls">
+        <label class="search-box">
+          <span>Find a character</span>
+          <input id="searchInput" type="search" placeholder="Boss Baby, Tabitha, Nannycam…" autocomplete="off" />
+        </label>
+
+        <fieldset class="continuity-filter">
+          <legend>Show in this list</legend>
+          <label class="toggle original"><input type="checkbox" value="original" checked /><span>Bossy Baby</span></label>
+          <label class="toggle bib"><input type="checkbox" value="bib" checked /><span>Boss Baby: Back in Business</span></label>
+          <label class="toggle family"><input type="checkbox" value="family" checked /><span>Boss Baby: Family Business</span></label>
+          <label class="toggle crib"><input type="checkbox" value="crib" checked /><span>Boss Baby: Back in the Crib</span></label>
+        </fieldset>
+
+        <fieldset class="role-filter">
+          <legend>Character type</legend>
+          <label><input type="checkbox" value="templeton" checked /> Templetons</label>
+          <label><input type="checkbox" value="babycorp" checked /> Baby Corp</label>
+          <label><input type="checkbox" value="friend" checked /> Friends &amp; family</label>
+          <label><input type="checkbox" value="antagonist" checked /> Antagonists</label>
+          <label><input type="checkbox" value="animal" checked /> Animals &amp; groups</label>
+        </fieldset>
+
+        <div class="actions">
+          <button id="addCharacter" type="button">Add character</button>
+          <button id="saveLocal" type="button">Save locally</button>
+          <button id="exportList" type="button">Export list</button>
+          <button id="importList" type="button">Import list</button>
+          <input id="importFile" class="visually-hidden" type="file" accept=".bblist,application/json" />
+          <button id="resetRanks" type="button" class="quiet">Reset ranks</button>
+        </div>
+        <p id="saveStatus" class="save-status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="workspace" aria-label="Character tier list workspace">
+        <div class="tiers" id="tiers"></div>
+        <aside class="pool" aria-label="Unranked characters">
+          <div class="pool-head">
+            <p class="kicker">The Baby Corp directory</p>
+            <h2>Unranked</h2>
+            <p id="catalogueCount"></p>
+          </div>
+          <div class="pool-list dropzone" id="poolList" data-tier="unranked"></div>
+        </aside>
+      </section>
+
+      <footer>
+        <span>Drag cards between tiers to rank them.</span>
+        <span>Roster includes named, credited, recurring, and collective characters across the four selected titles.</span>
+      </footer>
+    </main>
+
+    <dialog id="addDialog">
+      <form id="addCharacterForm">
+        <p class="kicker">Custom directory entry</p>
+        <h2>Add a character</h2>
+        <label>Name<input id="characterName" name="name" required maxlength="90" autocomplete="off" /></label>
+        <label>Title
+          <select name="show">
+            <option value="original">Bossy Baby</option>
+            <option value="bib">Boss Baby: Back in Business</option>
+            <option value="family">Boss Baby: Family Business</option>
+            <option value="crib">Boss Baby: Back in the Crib</option>
+          </select>
+        </label>
+        <label>Character type
+          <select name="role">
+            <option value="templeton">Templeton</option>
+            <option value="babycorp">Baby Corp</option>
+            <option value="friend">Friend / family</option>
+            <option value="antagonist">Antagonist</option>
+            <option value="animal">Animal / group</option>
+          </select>
+        </label>
+        <p id="addError" role="alert"></p>
+        <div class="dialog-actions"><button id="cancelAdd" type="button" class="quiet">Cancel</button><button type="submit">Add to directory</button></div>
+      </form>
+    </dialog>
+
+    <template id="cardTemplate">
+      <article class="character-card" draggable="true">
+        <div class="card-monogram" aria-hidden="true"></div>
+        <div class="card-copy"><strong></strong><span class="card-meta"></span></div>
+        <button class="remove-character" type="button" title="Remove custom character" aria-label="Remove custom character">×</button>
+      </article>
+    </template>
+    <script src="./characters.js"></script>
+  </body>
+</html>
