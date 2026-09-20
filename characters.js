@@ -48,6 +48,66 @@ add("crib", "animal", ["Precious Templeton", "Beefy", "Mr. Tigglesnooks", "Yarnb
 
 const base = [...roster.values()].sort((a, b) => a.name.localeCompare(b.name));
 
+// Relevance = overall character importance/prominence across the Boss Baby franchise.
+// Names near the top are the main characters; entries not listed here fall back
+// to number of appearances across the selected titles, then alphabetical order.
+const RELEVANCE_ORDER = [
+  "Boss Baby (Theodore Templeton Jr.)",
+  "Tim Templeton",
+  "Staci",
+  "Mega Fat CEO Baby",
+  "Jimbo",
+  "Triplets",
+  "Tina Templeton",
+  "Tabitha Templeton",
+  "Carol Templeton",
+  "Ted Templeton Sr.",
+  "Janice Templeton",
+  "Gigi Templeton",
+  "Big Ed",
+  "JJ",
+  "Pip",
+  "Dez",
+  "Hendershot",
+  "Scooter Buskie",
+  "Joy Freeman (Quiet Psycho Baby)",
+  "Brayden",
+  "Dakota",
+  "Jarreau McIntosh",
+  "Taffeta",
+  "Yvette",
+  "Francis E. Francis",
+  "Bootsy Calico",
+  "Dr. Erwin Armstrong",
+  "Crispin Biscuits",
+  "Nannycam No-Filter CEO Baby",
+  "Frederic Estes",
+  "Turtleneck Superstar",
+  "Magnus",
+  "Chip",
+  "Dondre",
+  "Amal",
+  "Buddy from HR",
+  "R&D Baby Simmons",
+  "Marsha Krinkle",
+  "Security Baby Katja",
+  "Security Baby Phil",
+  "Frankie",
+  "Wizzie",
+  "Precious Templeton",
+  "Uncuddleables",
+  "OCB",
+  "Wendi McCraken",
+  "Maria Maria",
+  "Pyg",
+  "Tam",
+  "Dr. Kevin, MD",
+  "Bug the Pug",
+  "Cat Cop",
+  "Consortium of Ancients"
+];
+const RELEVANCE_RANK = new Map(RELEVANCE_ORDER.map((name, index) => [name, index]));
+
 const NOTES = {
   "Boss Baby (Theodore Templeton Jr.)": "Tim's little brother and playgroup leader",
   "Tim Templeton": "Boss Baby's imaginative big brother",
@@ -140,11 +200,15 @@ function makeCard(character) {
 function setRank(id, tier, targetId = null, after = false) { state.order = state.order.filter((entry) => entry !== id); if (tier === "unranked") delete state.ranks[id]; else { state.ranks[id] = tier; const index = targetId && targetId !== id ? state.order.indexOf(targetId) : -1; if (index >= 0) state.order.splice(index + Number(after), 0, id); else state.order.splice(state.order.findLastIndex((entry) => state.ranks[entry] === tier) + 1, 0, id); } save(); render(); }
 function render() {
   document.querySelectorAll(".dropzone").forEach((zone) => { zone.innerHTML = ""; }); const fragments = Object.fromEntries(["unranked", ...TIERS].map((tier) => [tier, document.createDocumentFragment()]));
-  const ordering = new Map(state.order.map((id, index) => [id, index])); const selectedShows = new Set(els.shows.filter((box) => box.checked).map((box) => box.value)); const selectedRoles = new Set(els.roles.filter((box) => box.checked).map((box) => box.value)); const search = els.search.value.trim().toLowerCase(); const sortMode = els.sort.value; let visible = 0;
+  const selectedShows = new Set(els.shows.filter((box) => box.checked).map((box) => box.value)); const selectedRoles = new Set(els.roles.filter((box) => box.checked).map((box) => box.value)); const search = els.search.value.trim().toLowerCase(); const sortMode = els.sort.value; let visible = 0;
   const compareCharacters = (a, b) => {
     if (sortMode === "az") return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     if (sortMode === "za") return b.name.localeCompare(a.name, undefined, { sensitivity: "base" });
-    return (ordering.get(a.id) ?? Infinity) - (ordering.get(b.id) ?? Infinity) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    const aRank = RELEVANCE_RANK.get(a.name);
+    const bRank = RELEVANCE_RANK.get(b.name);
+    if (aRank !== undefined || bRank !== undefined) return (aRank ?? Infinity) - (bRank ?? Infinity);
+    if (a.shows.length !== b.shows.length) return b.shows.length - a.shows.length;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
   };
   allCharacters().sort(compareCharacters).forEach((character) => { const card = makeCard(character); const matches = character.shows.some((show) => selectedShows.has(show)) && selectedRoles.has(character.role) && (!search || character.name.toLowerCase().includes(search)); card.hidden = !matches; if (matches) visible += 1; fragments[state.ranks[character.id] || "unranked"].append(card); });
   Object.entries(fragments).forEach(([tier, fragment]) => document.querySelector(`[data-tier="${tier}"]`).append(fragment)); els.visible.textContent = `${visible} shown`; els.ranked.textContent = `${Object.keys(state.ranks).length} ranked`; els.catalogue.textContent = `${allCharacters().length} directory entries`;
